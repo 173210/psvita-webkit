@@ -1,0 +1,55 @@
+I. BACKGROUND
+http://en.wikipedia.org/wiki/WebKit#JavaScriptCore
+http://en.wikipedia.org/wiki/Safari_(web_browser)
+
+
+
+II. DESCRIPTION
+
+The heap memory buffer overflow vulnerability exists within the WebKit's JavaScriptCore
+JSArray::sort(...) method:
+    
+    // http://svn.webkit.org/repository/webkit/branches/safari-536.25-branch/Source/JavaScriptCore/runtime/JSArray.cpp
+   
+    void JSArray::sort(ExecState* exec, JSValue compareFunction, CallType callType, const CallData& callData)
+    {
+        ...
+
+        // FIXME: If the compare function modifies the array, the vector, map, etc. could be modified
+        // right out from under us while we're building the tree here.
+
+        unsigned numDefined = 0;
+
+        // Iterate over the array, ignoring missing values, counting undefined ones, and inserting all other ones into the tree.
+        for (; numDefined < usedVectorLength; ++numDefined) {
+            JSValue v = m_storage->m_vector[numDefined].get();
+            if (!v || v.isUndefined())
+                break;
+            tree.abstractor().m_nodes[numDefined].value = v;
+            tree.insert(numDefined); // calls compareFunction
+        }
+
+        ...
+
+        // FIXME: If the compare function changed the length of the array, the following might be
+        // modifying the vector incorrectly.
+
+        // Copy the values back into m_storage.
+        for (unsigned i = 0; i < numDefined; ++i) {
+            m_storage->m_vector[i].set(globalData, this, tree.abstractor().m_nodes[*iter].value);
+            ++iter;
+        }
+        ...
+    }
+
+This method accepts the user-defined JavaScript function and calls it from the 
+native code to compare array items. If this compare function reduces array length, 
+then the trailing array items will be written outside the "m_storage->m_vector[]" 
+buffer, what leads to the heap memory corruption.
+
+
+
+III. DETECTION 
+
+Apple Safari 6.0.1 for iOS 6.0
+Apple Safari 6.0.1 for OS X 10.7/8
