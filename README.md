@@ -12,6 +12,10 @@ Twitter: https://twitter.com/DaveeFTW
 
 Here are the gadgets used:
 
+
+```
+#!text
+
 ROM:81DE45CA                 LDR             R2, [R0,#0x48]
 ROM:81DE45CC                 MOV             R7, 0x8224F950
 ROM:81DE45D4                 MOVS            R0, R6
@@ -33,3 +37,4 @@ ROM:81AE84DE                 BLX             R3
 ROM:81EABC02                 MOVS.W          R2, #0x400
 ROM:81EABC06                 BLX             memcpy
 ROM:81EABC0A                 POP             {R4-R6,PC}
+```
